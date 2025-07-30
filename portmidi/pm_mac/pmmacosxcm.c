@@ -57,9 +57,9 @@
 #define MIDI_EOX        0xf7
 #define MIDI_STATUS_MASK 0x80
 
-static MIDIClientRef	client = NULL;	/* Client handle to the MIDI server */
-static MIDIPortRef	portIn = NULL;	/* Input port handle */
-static MIDIPortRef	portOut = NULL;	/* Output port handle */
+static MIDIClientRef	client = 0;	/* Client handle to the MIDI server */
+static MIDIPortRef	portIn = 0;	/* Input port handle */
+static MIDIPortRef	portOut = 0;	/* Output port handle */
 
 extern pm_fns_node pm_macosx_in_dictionary;
 extern pm_fns_node pm_macosx_out_dictionary;
@@ -304,8 +304,8 @@ midi_in_open(PmInternal *midi, void *driverInfo)
         midi->time_proc = (PmTimeProcPtr) Pt_Time;
     }
     
-    endpoint = (MIDIEndpointRef) descriptors[midi->device_id].descriptor;
-    if (endpoint == NULL) {
+    endpoint = (MIDIEndpointRef)(uintptr_t) descriptors[midi->device_id].descriptor;
+    if (endpoint == 0) {
         return pmInvalidDeviceId;
     }
 
@@ -332,8 +332,8 @@ midi_in_open(PmInternal *midi, void *driverInfo)
     if (macHostError != noErr) {
         pm_hosterror = macHostError;
         sprintf(pm_hosterror_text, 
-                "Host error %ld: MIDIPortConnectSource() in midi_in_open()",
-                macHostError);
+                "Host error %d: MIDIPortConnectSource() in midi_in_open()",
+                (int)macHostError);
         midi->descriptor = NULL;
         pm_free(m);
         return pmHostError;
@@ -353,8 +353,8 @@ midi_in_close(PmInternal *midi)
     
     if (!m) return pmBadPtr;
 
-    endpoint = (MIDIEndpointRef) descriptors[midi->device_id].descriptor;
-    if (endpoint == NULL) {
+    endpoint = (MIDIEndpointRef)(uintptr_t) descriptors[midi->device_id].descriptor;
+    if (endpoint == 0) {
         pm_hosterror = pmBadPtr;
     }
     
@@ -428,7 +428,7 @@ midi_write_flush(PmInternal *midi, PmTimestamp timestamp)
     OSStatus macHostError;
     midi_macosxcm_type m = (midi_macosxcm_type) midi->descriptor;
     MIDIEndpointRef endpoint = 
-            (MIDIEndpointRef) descriptors[midi->device_id].descriptor;
+            (MIDIEndpointRef)(uintptr_t) descriptors[midi->device_id].descriptor;
     assert(m);
     assert(endpoint);
     if (m->packet != NULL) {
@@ -442,8 +442,8 @@ midi_write_flush(PmInternal *midi, PmTimestamp timestamp)
 send_packet_error:
     pm_hosterror = macHostError;
     sprintf(pm_hosterror_text, 
-            "Host error %ld: MIDISend() in midi_write()",
-            macHostError);
+            "Host error %d: MIDISend() in midi_write()",
+            (int)macHostError);
     return pmHostError;
 
 }
@@ -648,9 +648,9 @@ CFStringRef EndpointName(MIDIEndpointRef endpoint, bool isExternal)
     CFRelease(str);
   }
   
-  MIDIEntityRef entity = NULL;
+  MIDIEntityRef entity = 0;
   MIDIEndpointGetEntity(endpoint, &entity);
-  if (entity == NULL)
+  if (entity == 0)
     // probably virtual
     return result;
   
@@ -664,7 +664,7 @@ CFStringRef EndpointName(MIDIEndpointRef endpoint, bool isExternal)
     }
   }
   // now consider the device's name
-  MIDIDeviceRef device = NULL;
+  MIDIDeviceRef device = 0;
   MIDIEntityGetDevice(entity, &device);
   if (device == NULL)
     return result;
@@ -890,7 +890,7 @@ PmError pm_macosxcm_init(void)
     /* Iterate over the MIDI input devices */
     for (i = 0; i < numInputs; i++) {
         endpoint = MIDIGetSource(i);
-        if (endpoint == NULL) {
+        if (endpoint == 0) {
             continue;
         }
 
@@ -916,20 +916,20 @@ PmError pm_macosxcm_init(void)
 
         /* Register this device with PortMidi */
         pm_add_device("CoreMIDI", cm_get_full_endpoint_name(endpoint),
-                      FALSE, (void*)endpoint, &pm_macosx_out_dictionary);
+                      FALSE, (void*)(uintptr_t)endpoint, &pm_macosx_out_dictionary);
     }
     return pmNoError;
     
 error_return:
     pm_hosterror = macHostError;
-    sprintf(pm_hosterror_text, "Host error %ld: %s\n", macHostError, error_text);
+    sprintf(pm_hosterror_text, "Host error %d: %s\n", (int)macHostError, error_text);
     pm_macosxcm_term(); /* clear out any opened ports */
     return pmHostError;
 }
 
 void pm_macosxcm_term(void)
 {
-    if (client != NULL)	 MIDIClientDispose(client);
-    if (portIn != NULL)	 MIDIPortDispose(portIn);
-    if (portOut != NULL) MIDIPortDispose(portOut);
+    if (client != 0)	 MIDIClientDispose(client);
+    if (portIn != 0)	 MIDIPortDispose(portIn);
+    if (portOut != 0) MIDIPortDispose(portOut);
 }
